@@ -7,7 +7,7 @@ const PORT = process.env.PORT || 3000;
 const COOLDOWN = 3600 * 1000; // 1 hour in milliseconds
 
 // Enable CORS for all routes
-app.use(cors({ origin: "*" }));
+app.use(cors({ origin: "https://rr-coupon-5p88cyn7k-aabid2947s-projects.vercel.app" }));
 app.use(express.json());
 app.use(cookieParser());
 
@@ -65,6 +65,38 @@ const ipClaims = new Map();
 const cookieClaims = new Map();
 
 
+
+function checkEligibility(ip, cookieId) {
+  const now = Date.now();
+
+  // Check IP cooldown
+  if (ipClaims.has(ip)) {
+    const lastClaimTime = ipClaims.get(ip);
+    if (now - lastClaimTime < COOLDOWN) {
+      return {
+        eligible: false,
+        remaining: Math.ceil((COOLDOWN - (now - lastClaimTime)) / 1000),
+      };
+    } else {
+      ipClaims.delete(ip); // Remove expired cooldown
+    }
+  }
+
+  // Check Cookie cooldown
+  if (cookieId && cookieClaims.has(cookieId)) {
+    const lastClaimTime = cookieClaims.get(cookieId);
+    if (now - lastClaimTime < COOLDOWN) {
+      return {
+        eligible: false,
+        remaining: Math.ceil((COOLDOWN - (now - lastClaimTime)) / 1000),
+      };
+    } else {
+      cookieClaims.delete(cookieId); // Remove expired cooldown
+    }
+  }
+
+  return { eligible: true, remaining: 0 };
+}
 // Helper function to get the client IP address
 function getClientIp(req) {
     const forwarded = req.headers["x-forwarded-for"];
