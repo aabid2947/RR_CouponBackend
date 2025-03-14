@@ -7,7 +7,7 @@ const PORT = process.env.PORT || 3000;
 const COOLDOWN = 3600 * 1000; // 1 hour in milliseconds
 
 // Enable CORS for all routes
-app.use(cors());
+app.use(cors({ origin: "*" }));
 app.use(express.json());
 app.use(cookieParser());
 
