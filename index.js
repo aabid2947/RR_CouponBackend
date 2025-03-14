@@ -7,7 +7,16 @@ const PORT = process.env.PORT || 3000;
 const COOLDOWN = 3600 * 1000; // 1 hour in milliseconds
 
 // Enable CORS for all routes
-app.use(cors({ origin: "https://rr-coupon-5p88cyn7k-aabid2947s-projects.vercel.app" }));
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin || origin.endsWith(".vercel.app")) {
+      callback(null, true);
+    } else {
+      callback(new Error("Not allowed by CORS"));
+    }
+  },
+  credentials: true, // Include cookies if needed
+}));
 app.use(express.json());
 app.use(cookieParser());
 
