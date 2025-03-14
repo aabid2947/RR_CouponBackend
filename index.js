@@ -64,31 +64,33 @@ let currentIndex = 0;
 const ipClaims = new Map();
 const cookieClaims = new Map();
 
+
+// Helper function to get the client IP address
+function getClientIp(req) {
+    const forwarded = req.headers["x-forwarded-for"];
+    return forwarded ? forwarded.split(/, /)[0] : req.ip;
+  }
+
+
 /**
  * Check eligibility based on IP and cookie.
  * Returns an object with:
  *  - eligible: boolean
  *  - remaining: remaining cooldown time (in seconds)
  */
-function checkEligibility(ip, cookieId) {
-  const now = Date.now();
-
-  if (ipClaims.has(ip) && now - ipClaims.get(ip) < COOLDOWN) {
-    return {
-      eligible: false,
-      remaining: Math.ceil((COOLDOWN - (now - ipClaims.get(ip))) / 1000),
-    };
-  }
-
-  if (cookieId && cookieClaims.has(cookieId) && now - cookieClaims.get(cookieId) < COOLDOWN) {
-    return {
-      eligible: false,
-      remaining: Math.ceil((COOLDOWN - (now - cookieClaims.get(cookieId))) / 1000),
-    };
-  }
-
-  return { eligible: true, remaining: 0 };
-}
+// In your routes, use the helper function:
+app.get("/eligibility", (req, res) => {
+    const ip = getClientIp(req);
+    const cookieId = req.cookies["couponTracker"];
+    const eligibility = checkEligibility(ip, cookieId);
+    const nextCoupon = COUPONS[currentIndex] || null;
+  
+    res.json({
+      ...eligibility,
+      claimedCoupon: null,
+      nextCoupon,
+    });
+  });
 
 // Endpoint to get all available coupons
 app.get("/coupons", (req, res) => {
@@ -113,10 +115,9 @@ app.get("/eligibility", (req, res) => {
 
 // Endpoint to claim a coupon
 app.post("/claim", (req, res) => {
-  const ip = req.ip;
+  const ip = getClientIp(req);
   let cookieId = req.cookies["couponTracker"];
 
-  // Generate and set a cookie if it doesn't exist
   if (!cookieId) {
     cookieId = Math.random().toString(36).substring(2);
     res.cookie("couponTracker", cookieId, {
@@ -125,7 +126,6 @@ app.post("/claim", (req, res) => {
     });
   }
 
-  // Verify eligibility
   const eligibility = checkEligibility(ip, cookieId);
   if (!eligibility.eligible) {
     return res.status(429).json({
@@ -133,16 +133,13 @@ app.post("/claim", (req, res) => {
     });
   }
 
-  // If no coupons available
   if (COUPONS.length === 0) {
     return res.status(404).json({ error: "No coupons available." });
   }
 
-  // Retrieve coupon using round-robin logic
   const coupon = COUPONS[currentIndex];
   currentIndex = (currentIndex + 1) % COUPONS.length;
 
-  // Record the claim time for abuse prevention
   const now = Date.now();
   ipClaims.set(ip, now);
   cookieClaims.set(cookieId, now);
